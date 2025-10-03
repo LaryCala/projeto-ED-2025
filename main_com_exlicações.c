@@ -1,3 +1,20 @@
+/*  Toda a implementação no está .h, o que é comum quando:
+    Querem compilar rápido sem fazer Makefile
+    São poucos arquivos
+    É um projeto pequeno/educacional
+
+    COMO ISSO FUNCIONA ATUALMENTE?
+    O main.c faz:
+    #include "huffman.h"    <- Pega TODO o código do Huffman
+    #include "pqueue_heap.h"  <- Pega TODO o código da fila de prioridade
+    
+    Na compilação:
+    gcc main.c -o programa  <- Só precisa do main.c!
+    ↑ Como tudo está nos .h, o compilador vê tudo como um arquivo só!
+
+    Isso permite compilar fácil, porém é mais lenta pq sempre recompila tudo a cada uso.
+*/
+
 #include <stdio.h> 
 #include <stdlib.h>
 #include <string.h>
@@ -165,4 +182,6 @@ int main() {
 
     return 0;
 }
+
+
 
