@@ -183,5 +183,104 @@ int main() {
     return 0;
 }
 
+/*
+OPÇÃO 1 - COMPACTAR ARQUIVO
+
+1. main() → opção 1
+2. Ler nome do arquivo → Abrir arquivo original
+3. Criar nome novo (base.huff)
+4. Criar filas de prioridade
+5. create_huff_queue() → Analisar frequências
+6. build_huffman_tree() → Construir árvore
+7. create_huffman_table() → Gerar códigos binários
+8. write_header() → Escrever cabeçalho
+9. compactor() → Compactar dados
+10. Fechar arquivos → Mensagem de sucesso
+
+Como Funciona Cada Parte:
+
+create_huff_queue()
+O que faz: Lê o arquivo byte por byte
+Como: Conta quantas vezes cada caractere aparece
+
+Exemplo: Se o arquivo tem "ABRA", fica:
+'A': 2 vezes
+'B': 1 vez
+'R': 1 vez
+
+Resultado: Cria nós com esses caracteres e frequências
+
+build_huffman_tree()
+O que faz: Constrói a árvore de Huffman
+Como: 
+Pega os 2 nós com menor frequência
+Cria um nó pai com soma das frequências
+Repete até sobrar apenas 1 nó (a raiz)
+
+create_huffman_table()
+O que faz: Gera os códigos binários para cada caractere
+Como: Percorre a árvore (0=esquerda, 1=direita)
+
+Exemplo:
+'A': 0
+'B': 10
+'R': 11
+
+Por quê? Caracteres mais frequentes têm códigos mais curtos
+
+📝 write_header()
+O que faz: Escreve informações necessárias para descompactar
+
+Contém:
+Lixo: Bits extras no final
+Tamanho da árvore: Quantos nós tem
+Árvore em pré-ordem: Para reconstruir depois
+
+⚡ compactor()
+O que faz: Substitui cada caractere pelo seu código Huffman
+
+Como:
+Lê 'A' → escreve '0'
+Lê 'B' → escreve '10'
+etc.
+
+BitBuffer: Agrupa bits até formar bytes completos
 
 
+
+OPÇÃO 2 - DESCOMPACTAR ARQUIVO
+
+1. main() → opção 2  
+2. Ler nome do arquivo .huff e extensão final
+3. decompact() → Abrir arquivo compactado
+4. read_header() → Ler lixo e tamanho da árvore
+5. read_tree() → Reconstruir árvore de Huffman
+6. decompress() → Ler bits e converter em caracteres
+7. Fechar arquivos → Mensagem de sucesso
+
+Como Funciona Cada Parte:
+
+📖 read_header()
+O que faz: Lê os primeiros 2 bytes do arquivo
+
+Extrai:
+3 bits: Quantidade de bits "lixo" no final
+13 bits: Tamanho da árvore de Huffman
+
+🌱 read_tree()
+O que faz: Reconstrói a árvore a partir da representação salva
+
+Como: Lê em pré-ordem:
+
+'0' → nó interno (continua lendo filhos)
+'1' → folha (próximo byte é o caractere)
+
+🔍 decompress()
+O que faz: Converte bits de volta em caracteres
+
+Como:
+Lê cada bit do arquivo compactado
+Percorre a árvore: 0=esquerda, 1=direita
+Quando chega numa folha, escreve o caractere
+Volta para a raiz e repete
+*/
