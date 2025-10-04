@@ -64,7 +64,7 @@ typedef struct NODE {
 } NODE;
 
 typedef struct {
-    NODE* data[MAX_HEAP];  // Array de ponteiros para nós
+    NODE* data[MAX_HEAP];  // Array de ponteiros para nós, se comporta como uma árvore heap
     int size;
 } PRIORITY_QUEUE;
 
@@ -78,7 +78,7 @@ NODE* create_node(unsigned char c, int freq, NODE* left, NODE* right) { //Cria u
     return NODE;
 }
 
-PRIORITY_QUEUE* create_queue() { // Cria uma nova fila de prioridade
+PRIORITY_QUEUE* create_queue() { // Cria uma nova fila de prioridade, menos frequencia primeiro
     PRIORITY_QUEUE* pq = malloc(sizeof(PRIORITY_QUEUE));
     pq->size = 0;
     return pq;
@@ -87,47 +87,96 @@ PRIORITY_QUEUE* create_queue() { // Cria uma nova fila de prioridade
 // Adicione isso antes de qualquer uso da função
 void free_huffman_tree(NODE* root);
 
-int is_empty(PRIORITY_QUEUE* pq) {
-    return pq->size == 0;
-}
-
-void swap(NODE** a, NODE** b) { //Troca dois nós
-    NODE* temp = *a;
-    *a = *b;
-    *b = temp;
-}
-
-
 /*
-    Heapify up a node
+O problema:
+O pqueue_heap.h precisa liberar memória dos nós, mas a função free_huffman_tree() está definida no huffman.h!
+
+A solução:
+
+void free_huffman_tree(NODE* root); <- Declaração ANTECIPADA
+
+Isso diz ao compilador: "Confia em mim, essa função existe em outro lugar!"
+
+Por que é necessário?
+Sem essa declaração, quando o compilador vê:
+
+free_huffman_tree(pq->data[i]);  ← no free_priority_queue()
+Ele pensa: "Que função é essa? Nunca vi!" → ERRO!
+
+Fluxo correto:
+
+Compilação:
+1. Vê void free_huffman_tree(NODE* root); → "Ok, existe em algum lugar"
+2. Vê free_huffman_tree(pq->data[i]) → "Ah, é aquela que prometeram!"
+3. Na ligação (linking): Encontra a implementação real no huffman.h
+
+Essa declaração antecipada resolve o problema da dependência circular entre os arquivos!
 */
+
+int is_empty(PRIORITY_QUEUE* pq) {
+    return pq->size == 0; //Fila vazia
+}
+
+//Quando inserimos ou removemos elementos, precisamos trocar posições no array para manter a ordem do heap.
+void swap(NODE** a, NODE** b) { //Troca dois nós
+    NODE* temp = *a; // Guarda o valor de a temporariamente
+    *a = *b; // Coloca o valor de b em a
+    *b = temp; // Coloca o valor de b em a
+}
+
+// Sempre que inserimos um novo elemento no final do heap, compara o elemento com seu pai e sobe até encontrar a posição correta.
 void heapify_up(PRIORITY_QUEUE* pq, int idx) {
-    int dad = (idx - 1) / 2;
+    int dad = (idx - 1) / 2; // Fórmula para encontrar o pai
+
+    // Se não é a raiz E é menor que o pai
     if (idx > 0 && pq->data[idx]->frequency < pq->data[dad]->frequency) {
-        swap(&pq->data[idx], &pq->data[dad]);
-        heapify_up(pq, dad);
+        swap(&pq->data[idx], &pq->data[dad]); // Troca com o pai
+        heapify_up(pq, dad); // Continua subindo
     }
 }
 
-/*
-    Heapify down a node
-*/
-
+//Sempre que removemos o elemento do topo do heap. Pega o último elemento (colocado no topo) e desce até encontrar a posição correta.
 void heapify_down(PRIORITY_QUEUE* pq, int idx) {
-    int lower = idx;
-    int left = 2 * idx + 1;
-    int right = 2 * idx + 2;
+    int lower = idx; // Assume que atual é o menor
+    int left = 2 * idx + 1; // Filho esquerdo
+    int right = 2 * idx + 2; // Filho direito
 
+    // Verifica se filho esquerdo é menor
     if (left < pq->size && pq->data[left]->frequency < pq->data[lower]->frequency)
         lower = left;
+
+    // Verifica se filho direito é menor
     if (right < pq->size && pq->data[right]->frequency < pq->data[lower]->frequency)
         lower = right;
 
+     // Se encontrou um filho menor, troca e continua descendo
     if (lower != idx) {
         swap(&pq->data[idx], &pq->data[lower]);
         heapify_down(pq, lower);
     }
 }
+
+/*
+Array: [A, B, C, D, E, F, G]
+       ↓
+Árvore:
+        A(0)
+       /    \
+     B(1)   C(2)
+    /   \   /   \
+  D(3) E(4) F(5) G(6)
+
+Fórmulas mágicas:
+
+Pai de i: (i - 1) / 2
+Filho esquerdo: 2*i + 1
+Filho direito: 2*i + 2
+
+Exemplos:
+Nó B(1) → Pai: (1-1)/2 = 0 → A 
+
+Nó A(0) → Filho esq: 2*0+1 = 1 → B, Filho dir: 2*0+2 = 2 → C
+*/
 
 void insert(PRIORITY_QUEUE* pq, NODE* node) { //
     if (pq->size >= MAX_HEAP) {
@@ -135,9 +184,10 @@ void insert(PRIORITY_QUEUE* pq, NODE* node) { //
         return;
     }
     pq->data[pq->size] = node; //Coloca no final do array
-    heapify_up(pq, pq->size); //"Flutua" o nó para cima até encontrar lugar certo
-    pq->size++;
+    heapify_up(pq, pq->size);//Chama heapify_up para organizar 
+    //"Sobe" o nó para cima até encontrar lugar certo
     //Mantém a propriedade do heap
+    pq->size++; //Atualiza contador 
 }
 
 NODE* remove_lower(PRIORITY_QUEUE* pq) {
@@ -146,12 +196,13 @@ NODE* remove_lower(PRIORITY_QUEUE* pq) {
     NODE* min = pq->data[0]; //Pega o primeiro elemento (sempre o menor)
     pq->size--;
     pq->data[0] = pq->data[pq->size]; //Pega o último e coloca no início  
-    heapify_down(pq, 0); //"Afunda" esse elemento até encontrar lugar certo
-    return min;
+    heapify_down(pq, 0); //Chama heapify_down para organizar
+    //"Afunda" esse elemento até encontrar lugar certo
+    return min; //Retorna o elemento
 }
 
-
-void print_priority_queue(PRIORITY_QUEUE* pq) {
+//Função de DEBUG, não aparece quando o código (main.c) é compilado.
+/*void print_priority_queue(PRIORITY_QUEUE* pq) {
     if (pq == NULL || pq->size == 0) {
         printf("Fila vazia ou inexistente.\n");
         return;
@@ -166,7 +217,7 @@ void print_priority_queue(PRIORITY_QUEUE* pq) {
             printf("'\\x%02x' (%d): freq = %d\n", (unsigned char)current->character, current->character, current->frequency);
         }
     }
-}
+}*/
 
 void free_priority_queue(PRIORITY_QUEUE* pq) {
     if (pq == NULL) return;
@@ -174,7 +225,7 @@ void free_priority_queue(PRIORITY_QUEUE* pq) {
     for (int i = 0; i < pq->size; i++) {
         free_huffman_tree(pq->data[i]); // Libera cada nó na fila
     }
-    free(pq); // Liberte a própria fila de prioridades
+    free(pq); // Liberte a estrutura da fila
 }
 
 
