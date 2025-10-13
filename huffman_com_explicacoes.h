@@ -316,8 +316,6 @@ void write_header(PRIORITY_QUEUE* pq, HuffmanCode huff_table[256], FILE *output_
     byte2 = 00011001 = 25
     */
 
-
-
     //os dois bytes lidos acima serão os primeiros dois bytes do arquivo compactado
     fwrite(&byte1, 1, 1, output_file); //fwrite: Escrever dados em binários
     fwrite(&byte2, 1, 1, output_file); 
@@ -328,18 +326,12 @@ void write_header(PRIORITY_QUEUE* pq, HuffmanCode huff_table[256], FILE *output_
        output_file) // Arquivo onde escrever
     */
 
-    write_tree(root, output_file); //Depois de escrever os dois bytes agora chama white_tree para escrever a arvore em PRE ORDEM 
+    write_tree(root, output_file); //Depois de escrever os dois bytes agora chama write_tree para escrever a arvore em PRE ORDEM 
 }
-
-
-
-
-/////PAREI AQUI/////
-
-
 
 // Estrutura para armazenar bits até completar um byte
 //vai acumulando bits um a um até formar um byte completo (8 bits)
+//É para a COMPACTAÇÃO dos DADOS do arquivo original
 typedef struct {
     unsigned char byte;
     int bits_used;
@@ -359,7 +351,7 @@ Isso abre espaço no final (bit menos significativo) para o novo bit. -> 0000000
     bit_buffer->bits_used++; //Aumenta o contador de bits já utilizados no byte.
 }
 
-//escreve o conteúdo parcial do BitBuffer no arquivo, preenchendo com zeros os bits restantes até formar 8 bits.
+//Escreve o conteúdo parcial do BitBuffer no arquivo, preenchendo com zeros os bits restantes até formar 8 bits.
 void write_buffer(FILE *f, BitBuffer *bit_buffer) { 
     if (bit_buffer->bits_used == 0) return;//Se o buffer estiver vazio, não há nada para escrever.
 
@@ -383,29 +375,57 @@ O deslocamento será 8 - 5 = 3
 // Escreve os dados compactados no novo arquivo
 void compactor(FILE *input_file, FILE *output_file, HuffmanCode huff_table[256]) {
     unsigned char c;
-    BitBuffer bit_buffer = {0, 0}; // Initialize the bit buffer
+    BitBuffer bit_buffer = {0, 0}; //Inicializa bit_buffer
 
-    // Read each character from the input file
+    // Lê cada caractere do arquivo de entrada
     while (fread(&c, 1, 1, input_file) == 1) {
+        // 1. Pega o código Huffman desse byte
         HuffmanCode code = huff_table[c];
 
-        // Skip characters with no Huffman code
-        //if (code.length == 0) continue;
-
-        // Add each bit of the Huffman code to the bit buffer
+        // 2. Adiciona cada bit do código Huffman ao buffer (do mais significativo pro menos)
         for (int i = code.length - 1; i >= 0; i--) {
-            bit_buffer_add(&bit_buffer, (code.code >> i) & 1);
+        // Pega o bit MAIS SIGNIFICATIVO primeiro
+        // e vai até o bit MENOS SIGNIFICATIVO
 
-            // Write the buffer to the file when it is full
+        /*Exemplo Prático:
+        Se temos um código Huffman:
+        
+        code.code = 5 (binário: 101)
+        code.length = 3 (3 bits)
+        
+        O loop vai:
+        i = 2: pega o bit na posição 2 (mais à esquerda)
+        i = 1: pega o bit na posição 1  
+        i = 0: pega o bit na posição 0 (mais à direita)
+        */
+
+            // 3. Pega o bit atual: (code.code >> i) & 1
+            bit_buffer_add(&bit_buffer, (code.code >> i) & 1);
+            
+            // 4. Se buffer cheio, escreve byte(8 bits)
             if (bit_buffer.bits_used == 8) { 
                 write_buffer(output_file, &bit_buffer);
             }
         }
     }
 
-    // Write any remaining bits in the buffer
+    // 5. Escreve bits que sobraram (último byte incompleto)
     write_buffer(output_file, &bit_buffer);
 }
+
+/*
+// 1. PRIMEIRO: Prepara tudo
+create_huff_queue(original_file, &huff_queue1, &huff_queue2);
+NODE* root = build_huffman_tree(huff_queue1);
+create_huffman_table(root, code, 0, huff_table);
+
+// 2. DEPOIS: Escreve cabeçalho + árvore
+write_header(huff_queue2, huff_table, new_file, root);
+
+// 3. FINALMENTE: Compacta os dados (ESSA função!)
+rewind(original_file);  // Volta ao início do arquivo
+compactor(original_file, new_file, huff_table);  // ← AQUI!
+*/
 
 void free_huffman_tree(NODE* root) {
     if (root == NULL) return;
@@ -416,7 +436,7 @@ void free_huffman_tree(NODE* root) {
 }
 
 
-
+/////PAREI AQUI/////
 
 
 /*
