@@ -436,8 +436,6 @@ void free_huffman_tree(NODE* root) {
 }
 
 
-/////PAREI AQUI/////
-
 
 /*
     FUNÇÕES PARA DESCOMPACTAR O ARQUIVO
@@ -455,31 +453,40 @@ void read_header(FILE *file, int *trash, int *tree_size) { //recebe o ponteiro p
     /*calculando a soma dos bytes 
     byte 1 =  0000000011111111 ; byte 2 = 0000000010101010
     (byte << 8) = 1111111100000000 -> quando faz o | (fazendo o OR) junta byte 1 com o byte 2 e tem o os 16bytes do cabeçalho*/
-    unsigned short header = (byte1 << 8) | byte2;
+    unsigned short header = (byte1 << 8) | byte2; //'|' é OR (ou)
+    /*byte1 = 01100000, byte2 = 00011001
+    
+    byte1 << 8:  01100000 00000000  ← byte1 vai para esquerda
+    byte2:     01100000 00000000 | 00000000 00011001 = 01100000 00011001*/
 
-    *trash = header >> 13; // faz os shitf pra direita e pega somento o lixo
-    *tree_size = header & 0x1FFF; // 13 bits de tamanho da árvore
-    //setando o bit (fazendo um AND) e ignora o incio que é em hexadecimal , voce tem os 13 bits da arvore  
+    *trash = header >> 13; // faz os shitf pra direita e pega somente o lixo
+    *tree_size = header & 0x1FFF; 
+    //0x1FFF é um número em hexadecimal, e corresponde a 8191 em decimal, ou 0001 1111 1111 1111 em binário (13 bits ligados em 1).OS 13 bits de tamanho da árvore
+    /*Exemplo:
+    header:   0110000000011001
+    & (AND)
+    0x1FFF:   0001111111111111
+    result:   0000000000011001 = 25  ← Só passou os 13 bits da direita!*/
 }
 
-// Lê a árvore codificada no arquivo compactado e reconstrói a árvore de Huffman a partir da representação pré-ordem que está gravada no arquivo logo após os 2 bytes do cabeçalho.
+// Lê a árvore codificada no arquivo compactado e reconstrói a árvore de Huffman a partir da representação em pré-ordem que está gravada no arquivo logo após os 2 bytes do cabeçalho.
 NODE* read_tree(FILE *file, int *bytes_read) { 
     // c sera 1 ou 0 (tipo do NO)
-     int c= fgetc(file);//fgetc : ler um único caractere de um arquivo
+    int c= fgetc(file);//fgetc : ler um único caractere de um arquivo
     (*bytes_read)++; //conta quantos bytes da árvore já foram lidos
 
     if (c == '1') { //Se for '1': é uma folha (chegamos a um caracter da arvore)
-        int next = fgetc(file);  // ler o proximo caracter do arquivo 
-        (*bytes_read)++; //conta +1 byte lido 
+        int next = fgetc(file);  //Ler o proximo caracter do arquivo 
+        (*bytes_read)++; //Conta +1 byte lido 
 
-        if (next == '\\') { // considerando o caso em que o caracter de "escape"
+        if (next == '\\') { //Considerando o caso em que o caracter de "escape"
             next = fgetc(file);
             (*bytes_read)++;
         }
 
-        return create_node((unsigned char)next, 0, NULL, NULL); // cria o no , nosso caracter 
+        return create_node((unsigned char)next, 0, NULL, NULL); //Cria o nó, nosso caracter 
 
-    } else if (c == '0') { // Se for '0': é um nó interno ( um no com nada que aponta pro filhos)
+    } else if (c == '0') { //Se for '0': é um nó interno ( um no com nada que aponta pro filhos)
         //chamada recurssiva para filhos 
         NODE *left = read_tree(file, bytes_read); // chama filho pra esquerda 
         NODE *right = read_tree(file, bytes_read); // chama filho para direita 
@@ -487,24 +494,66 @@ NODE* read_tree(FILE *file, int *bytes_read) {
     }
 
     return NULL; //quando fgetc nao retorna um caracter (evita dados invalidos)
+    /*O que acontece se fgetc falhar?
+
+    int c = fgetc(file);  // Pode retornar EOF (End Of File) em caso de erro
+    Situações onde fgetc retorna EOF:
+
+    Fim do arquivo inesperado (arquivo corrompido)
+    Erro de leitura (disco com problema)
+    Dados inválidos na serialização
+
+    Com return NULL: A função retorna NULL indicando "não consegui reconstruir"
+    */
 }
 
 // Percorre os bits do corpo compactado e escreve os caracteres no arquivo de saída
 void decompress(FILE *input, FILE *output, NODE* root, int trash_size, int header_bytes) {
-        //(arquivo,numero de byte a desloca,ponto de referencia para deslocamento)
-    fseek(input, 0, SEEK_END); //fseek : reposiciona o ponteiro de leitura/escrita dentro de um arquivo (permite navegar para qualquer posição no arquivo)
-    long file_size = ftell(input); //ftell : usada para obter a posição atual do ponteiro de leitura/escrita em um arquivo
-    long data_size = file_size - header_bytes; //data_size = tamanho do arquivo - tamanho do cabeçalho 
-    fseek(input, header_bytes, SEEK_SET); 
+    // input: arquivo compactado (.huff) para ler
+    // output: arquivo descompactado para escrever  
+    // root: raiz da árvore de Huffman reconstruída
+    // trash_size: quantos bits ignorar no último byte (0-7)
+    // header_bytes: quantos bytes pular (cabeçalho + árvore)
 
-    NODE* current = root;
-    unsigned char byte;
-    //Começa a ler byte a byte da parte compactada.
-    for (long i = 0; i < data_size; i++) {
+    fseek(input, 0, SEEK_END); // Vai para o FINAL do arquivo
+    //fseek(arquivo, posição, origem -> SEEK_END = final do arquivo); 
+    //fseek : Move o "cursor" de leitura/escrita dentro do arquivo, como se você escolhesse onde começar a ler ou escrever
+    long file_size = ftell(input); // Pega quantos bytes tem o arquivo
+    //ftell : Retorna a posição atual do cursor (em bytes a partir do início do arquivo). É um jeito de descobrir o tamanho total do arquivo.
+    long data_size = file_size - header_bytes; // Calcula tamanho dos dados
+    //data_size = tamanho do arquivo - tamanho do cabeçalho 
+    fseek(input, header_bytes, SEEK_SET); // Volta para INÍCIO dos dados
+     // Vai para header_bytes depois do INÍCIO -> SEEK_SET = início do arquivo
+
+    NODE* current = root; // Começa na raiz da árvore
+    unsigned char byte; //Começa a ler byte a byte da parte compactada.
+
+    for (long i = 0; i < data_size; i++) { //cada byte nos dados
         fread(&byte, 1, 1, input);//ler o byte atual
+        /* Função fread(&byte <- Onde guardar (endereço de byte), 1 <- Tamanho de CADA elemento (1 byte), 1 <- Quantos elementos ler (1 elemento), input <- Arquivo de onde ler)*/
+        
 
-        for (int bit = 7; bit >= 0; bit--) { //setando os bit do byte atual
-            int current_bit = (byte >> bit) & 1; // bit_atual = shift rigth do byte , bit vezes , e senta ele fazendo um AND 1
+        for (int bit = 7; bit >= 0; bit--) { //cada bit no byte (do mais pro menos significativo)
+
+            int current_bit = (byte >> bit) & 1; // bit_atual = shift rigth do byte, bit vezes, e seta ele fazendo um AND 1
+
+            /*Exemplo:
+            byte = 173 (10101101):
+
+            bit=7: 10101101 >> 7 = 00000001 & 1 = 1
+            bit=6: 10101101 >> 6 = 00000010 & 1 = 0  
+            bit=5: 10101101 >> 5 = 00000101 & 1 = 1
+            bit=4: 10101101 >> 4 = 00001010 & 1 = 0
+            bit=3: 10101101 >> 3 = 00010101 & 1 = 1
+            bit=2: 10101101 >> 2 = 00101011 & 1 = 1
+            bit=1: 10101101 >> 1 = 01010110 & 1 = 0
+            bit=0: 10101101 >> 0 = 10101101 & 1 = 1
+
+            Resultado: 1 0 1 0 1 1 0 1 (exatamente os bits do byte!) 
+            
+            Assim cada bit é analisado, um de cada vez.
+            */
+
             if (current_bit == 0) // para cada bit , vai ser 0 para o filho a esquerda 
                 current = current->left;
             else
@@ -515,14 +564,10 @@ void decompress(FILE *input, FILE *output, NODE* root, int trash_size, int heade
                 fputc(current->character, output); //fputc : escreve um único caractere em um arquivo (escreve o caractere no arquivo de saída.)
                 current = root; //Reinicia o ponteiro na raiz da árvore para continuar.
             }
-            /*exempolo dos for acima: 
-            byte: 10100000
-            bit 7: 1
-            bit 6: 0
-            bit 5: 1*/
 
             // Evita processar bits de "lixo" no último byte
-            // i = tamanho do dado - 1 e bit = lixo - 1 ( -1 pq vai de 0 a 7 bit )
+            // Para no ÚLTIMO byte (i == data_size - 1) 
+            // no ÚLTIMO bit válido (bit == trash_size - 1)
             if (i == data_size - 1 && bit == trash_size - 1) { //os ultimos bits é o lixo e nao deve ser processado 
                 return;//A função termina assim que os bits válidos acabam, evitando decodificar lixo.
             }
@@ -532,8 +577,27 @@ void decompress(FILE *input, FILE *output, NODE* root, int trash_size, int heade
 
 // Função principal chamada na main
 void decompact(const char* compressed_filename, char final_format[]) {
-                    // fopen : abre arquivo em modo de leitura em binario"rb"
+    // "const char*" = string constante (não pode ser modificada)
+    // compressed_filename = nome do arquivo .huff para descompactar
+    // final_format = extensão desejada para o arquivo final
+
+    /*Quem fornece esses valores?
+    Do main.c:
+    
+    
+    printf("\nInsira o nome do arquivo compactado (.huff):\n");
+    scanf("%s", compressed_filename);  // ← usuário digita
+    
+    printf("\nInsira o formato da extensao final (ex: jpg, txt, etc):\n");
+    scanf("%s", final_format);         // ← usuário digita
+    
+    decompact(compressed_filename, final_format);  // ← Passa para a função
+    */
+
+
     FILE *input_file = fopen(compressed_filename, "rb"); //abre o arquivo compactado 
+    // fopen : abre arquivo em modo de leitura em binario"rb"
+    
     if (!input_file) { //se falhar 
         perror("Erro ao abrir o arquivo compactado");
         return;
@@ -541,7 +605,8 @@ void decompact(const char* compressed_filename, char final_format[]) {
 
     // Cria nome para o arquivo de saída
     char output_filename[BUFFER_SIZE]; 
-    strcpy(output_filename, compressed_filename); //strcpy : copia a string compressed_filename para output_filename
+    strcpy(output_filename, compressed_filename); 
+    //strcpy(destino, origem);  <- Copia string origem para destino, de compressed_filename para output_filename
     char* dot = strrchr(output_filename, '.');  // strrchr : procura a última ocorrência do caractere '.' na string.
     if (dot) *dot = '\0';  // Remove a extensão atual
     /*dot → aponta para o caractere `'.'` antes de `"huff"`
@@ -549,12 +614,21 @@ void decompact(const char* compressed_filename, char final_format[]) {
      Isso corta a string naquele ponto, removendo a extensão final.
      output_filename = "texto.txt";  // extensão .huff foi removida*/
 
-    // Acrescenta o sufixo e a nova extensão ex.:descompactado.txt
-   snprintf(output_filename, sizeof(output_filename), "%.*s_descompactado.%s", 
-        (int)(sizeof(output_filename) - strlen("_descompactado.") - strlen(final_format) - 1), 
-        output_filename, 
-        final_format); //mudanca
 
+    // Acrescenta o sufixo e a nova extensão ex.:descompactado.txt
+   snprintf(output_filename, sizeof(output_filename), "%.*s_descompactado.%s", (int)(sizeof(output_filename) - strlen("_descompactado.") - strlen(final_format) - 1), output_filename,  final_format);
+    //snprinf: Formata dados e os escreve em um buffer de caractere, similar à função printf, mas com a adição de um parâmetro de tamanho máximo para evitar buffer overflows. 
+   //strlen - CONTADOR DE LETRAS
+
+   /*Por que esse calculo?
+   Evitar overflow!
+
+   Exemplo:
+   256 (tamanho máximo)
+   - 15 ("_descompactado.") 
+   - 3 ("jpg")
+   - 1 ('\0')
+   = 237 caracteres máximos para o nome base*/
 
     FILE *output_file = fopen(output_filename, "wb"); //abre arquivo em modo de escrita em binario"wb"
     if (!output_file) {
@@ -562,14 +636,32 @@ void decompact(const char* compressed_filename, char final_format[]) {
         fclose(input_file);
         return;
     }
-    //le o cabeçalho 
-        //tam lixo , tam arvore , byte lido :conta quantos bytes da árvore foram lidos (para saber onde começa o corpo compactado)
+    
+    //Lê o cabeçalho     
     int trash_size = 0, tree_size = 0, bytes_read = 0;
-    read_header(input_file, &trash_size, &tree_size); // lê o lixo e o tamanho da árvore
-    NODE* root = read_tree(input_file, &bytes_read); // reconstrói a árvore de Huffman a partir dos próximos tree_size bytes
-    //Descompacta o corpo usando a árvore
-    decompress(input_file, output_file, root, trash_size, 2 + bytes_read);
-    //2 + bytes_read -> dai-se pq o cabeçalho vem com 1 byte do lixo + 1 byte da arvore  + o bytes restante 
+    //tam lixo , tam arvore , byte lido :conta quantos bytes da árvore foram lidos (para saber onde começa o corpo compactado)
+    read_header(input_file, &trash_size, &tree_size); //Lê o lixo e o tamanho da árvore
+    NODE* root = read_tree(input_file, &bytes_read); //Reconstrói a árvore de Huffman a partir dos próximos tree_size bytes
+
+
+    decompress(input_file, output_file, root, trash_size, 2 + bytes_read); //Descompacta o corpo usando a árvore
+    /*
+    O que 2 + bytes_read realmente significa:
+
+    2 = bytes do CABEÇALHO
+    Byte 1 + Byte 2 = 2 bytes com informações do lixo e tamanho da árvore
+    
+    bytes_read = bytes da ÁRVORE
+    Quantos bytes foram lidos para reconstruir a árvore
+    
+    2 + bytes_read = TOTAL de bytes para PULAR
+
+    [2 bytes: cabeçalho][X bytes: árvore][dados...]
+     ↑                   ↑                ↑
+    cabeçalho          árvore           dados começam AQUI
+
+    = posição onde os dados compactados começam
+    */
 
     printf("Arquivo descompactado com sucesso: %s\n", output_filename);
 
