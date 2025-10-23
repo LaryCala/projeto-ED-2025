@@ -1,11 +1,16 @@
 #include <stdio.h> 
-#include <string.h> //Usado para funções como manipulação de linhas do arquivo
+#include <string.h> 
 #include <stdbool.h>
-#include <math.h> //Usado principalmente para abs() (valor absoluto) ao trabalhar com literais positivos/negativos
+#include <math.h> 
 #include <stdlib.h> 
 
+//int* - PONTEIRO PARA ARRAY DINÂMICO 
+/*Armazena ENDEREÇO DE MEMÓRIA de um array
+Pode acessar MÚLTIPLOS valores
+Tamanho variável: pode crescer/diminuir*/
+
 typedef struct {
-    int* literais;      
+    int* literais;    
     int num_literais;  
 } Clausula;
 
@@ -21,8 +26,8 @@ typedef struct {
 } Interpretacao;
 
 // Função para ler fórmula no formato DIMACS
-Formula ler_dimacs(const char* nome_arquivo) {
-    FILE* arquivo = fopen(nome_arquivo, "r");
+Formula ler_dimacs(const char* nome_arquivo) { //Essa função retorna uma estrutura complexa, não apenas um número ou verdadeiro/falso.
+    FILE* arquivo = fopen(nome_arquivo, "r"); //Abre o arquivo para leitura
     if (arquivo == NULL) {
         printf("Erro ao abrir o arquivo %s\n", nome_arquivo);
         exit(1);
@@ -51,32 +56,71 @@ Formula ler_dimacs(const char* nome_arquivo) {
         }
     }
     
-    int clausula_atual = 0; //Controla qual cláusula estamos preenchendo, de 0 a num_clausulas-1
-    int capacidade_atual = 0;
-    int literal;
+    int clausula_atual = 0; //Indica qual cláusula estamos preenchendo agora, de 0 até num_clausulas-1.
+    int capacidade_atual = 0; //Armazena quantos literais já cabem na memória alocada do vetor atual; usado pra realocação dinâmica.
+    int literal; //Vai guardar temporariamente cada número lido do arquivo.
     
     // Ler cláusulas
-    while (fscanf(arquivo, "%d", &literal) != EOF && clausula_atual < F.num_clausulas) { //fscanf lê um número por vez do arquivo
-        if (literal == 0) { //No formato DIMACS, 0 marca o fim de uma cláusula
-            clausula_atual++; //Quando encontra 0, passa para a próxima cláusula
-            continue;
+    while (fscanf(arquivo, "%d", &literal) != EOF && clausula_atual < F.num_clausulas) { //fscanf lê um número por vez do arquivo 
+        /*O loop continua até chegar no final do arquivo (EOF) ou até termos lido todas as cláusulas.
+        
+        Cada número do arquivo representa:
+        Um literal (positivo ou negativo) 
+        Ou 0, que indica fim da cláusula (padrão do DIMACS).
+        */
+        if (literal == 0) { //Se literal for 0, significa que a cláusula atual acabou.
+            clausula_atual++; //Então incrementa clausula_atual para começar a preencher a próxima cláusula. "move o foco para a próxima cláusula no vetor F.clausulas"
+            continue; //'continue' pula o resto do loop, porque não há literal 0 de verdade para guardar.
         }
         
         // Realocar se necessário
-        if (F.clausulas[clausula_atual].num_literais == 0) {
-            F.clausulas[clausula_atual].literais = (int*)malloc(10 * sizeof(int));
+        if (F.clausulas[clausula_atual].num_literais == 0) { //num_literais == 0 significa: esta cláusula está vazia
+            //É o primeiro literal que estamos adicionando
+            F.clausulas[clausula_atual].literais = (int*)malloc(10 * sizeof(int)); //malloc(10 * sizeof(int)): aloca espaço para 10 inteiros inicialmente
             capacidade_atual = 10; //Primeira alocação: 10 espaços 
         }
-        else if (F.clausulas[clausula_atual].num_literais >= capacidade_atual) {
-            capacidade_atual *= 2;
-            F.clausulas[clausula_atual].literais = (int*)realloc( //Se encher: dobra a capacidade 
-                F.clausulas[clausula_atual].literais, 
-                capacidade_atual * sizeof(int)
+        else if (F.clausulas[clausula_atual].num_literais >= capacidade_atual) { //num_literais >= capacidade_atual: o array está cheio!
+            capacidade_atual *= 2; //capacidade_atual *= 2: dobra a capacidade (10 → 20 → 40 → 80...)
+            F.clausulas[clausula_atual].literais = (int*)realloc( //realloc(): redimensiona o array mantendo os dados existentes
+                F.clausulas[clausula_atual].literais, //<-Diz ao realloc QUAL array redimensionar
+                capacidade_atual * sizeof(int) //Tradução: "Redimensiona para caber 20 inteiros"
+                /*Cálculo:
+                
+                capacidade_atual = 20 (após dobrar de 10)
+                sizeof(int) = 4 bytes (normalmente)
+                20 * 4 = 80 bytes*/
             );
         }
         
-        F.clausulas[clausula_atual].literais[F.clausulas[clausula_atual].num_literais++] = literal; //Adiciona o literal no array
+        F.clausulas[clausula_atual].literais[F.clausulas[clausula_atual].num_literais++] = literal; //Coloca o literal lido na próxima posição livre da cláusula atual, e aumenta o contador de quantos literais essa cláusula já tem
         //num_literais++ incrementa o contador após usar o índice
+
+
+        /*
+        F.clausulas[clausula_atual]
+        → acessa a cláusula atual, ou seja, o espaço da fórmula onde estamos guardando os literais no momento.
+        Exemplo: se clausula_atual = 0, estamos mexendo na primeira cláusula.
+        
+        .literais[...]
+        → dentro dessa cláusula, acessamos o vetor que contém seus literais.
+        
+        F.clausulas[clausula_atual].num_literais
+        → indica quantos literais já foram adicionados até agora.
+        Esse valor é usado como índice (posição no vetor) para colocar o novo literal.
+        
+        F.clausulas[clausula_atual].num_literais++
+        → o ++ pós-fixado (depois da variável) significa:
+        
+        primeiro use o valor atual de num_literais no índice,
+        
+        depois some 1 nele.
+        
+        Exemplo prático:
+        Se num_literais era 0, o literal será colocado em literais[0],
+        e depois num_literais passa a valer 1.
+        
+        = literal
+        → aqui é onde o literal recém-lido do arquivo (fscanf) é finalmente armazenado na posição certa.*/
 
     }
     
@@ -106,12 +150,13 @@ Formula ler_dimacs(const char* nome_arquivo) {
 
 // Verifica se uma cláusula é satisfeita pela interpretação atual
 bool clausula_satisfeita(const Clausula* clausula, const Interpretacao* interpretacao) {
-    for (int i = 0; i < clausula->num_literais; i++) {
-        int literal = clausula->literais[i];
-        int index = abs(literal);
-        int valor = interpretacao->valores[index];
+    for (int i = 0; i < clausula->num_literais; i++) { //Percorre todos os literais que estão dentro da cláusula atual.
+        int literal = clausula->literais[i]; //pega o literal da posição i.             
+        int index = abs(literal); //pega o número da variável, ignorando o sinal.
+        int valor = interpretacao->valores[index];//consulta na interpretação atual se essa variável está atribuída a: 1 → verdadeiro, 0 → falso, -1 → indefinido (ainda não atribuído).
 
         if ((literal > 0 && valor == 1) || (literal < 0 && valor == 0)) {
+            //literal = -1 < 0, valor = 1 <-Falso
             return true;
         }
     }
@@ -123,7 +168,7 @@ bool todas_variaveis_atribuidas_na_clausula(const Clausula* clausula, const Inte
     for (int i = 0; i < clausula->num_literais; i++) {
         int index = abs(clausula->literais[i]);
         if (interpretacao->valores[index] == -1) {
-            return false;
+            return false;   
         }
     }
     return true;
@@ -142,8 +187,8 @@ int encontrar_variavel_livre(const Interpretacao* interpretacao) {
 // Função principal do resolvedor SAT (backtracking)
 bool resolver_sat(Formula* formula, Interpretacao* interpretacao) {
     for (int i = 0; i < formula->num_clausulas; i++) {
-        if (!clausula_satisfeita(&formula->clausulas[i], interpretacao)) {
-            if (todas_variaveis_atribuidas_na_clausula(&formula->clausulas[i], interpretacao)) {
+        if (!clausula_satisfeita(&formula->clausulas[i], interpretacao)) { //Testa as clausulas, uma não deu certo, para e vai para o if
+            if (todas_variaveis_atribuidas_na_clausula(&formula->clausulas[i], interpretacao)) { //Uma clausula não deu certo e todas as atribuições foram feitas? Não é a configuração certa. Para e muda
                 return false;
             }
         }
@@ -165,20 +210,19 @@ bool resolver_sat(Formula* formula, Interpretacao* interpretacao) {
     return false;
 }
 
+
 int main() {
     const char* arquivo_cnf = "input.txt"; //O código vai ler deste arquivo, e define um nome pra ele
     //'const' significa que não pode ser modificado
     
-    Formula F = ler_dimacs(arquivo_cnf); //Chama a a função, lê o arquivo e retorna uma estrutura 'Formula' completamente preenchida
-    /*F agora contém:
-      Numero toral de váriaveis e cláusulas
-      Array com todas as cláusulas e seus literais
-    */
+    Formula F = ler_dimacs(arquivo_cnf); //Chama a função, lê o arquivo e retorna uma estrutura 'Formula' completamente preenchida, é declarada e preenchida ao mesmo tempo, por causa do '=' com a função.
     
-    Interpretacao I;
-    I.num_variaveis = F.num_variaveis;
-    I.valores = (int*)malloc((F.num_variaveis + 1) * sizeof(int));
-
+    Interpretacao I; //Cria uma variável I do tipo Interpretacao. Ela vai guardar os valores (atribuições) para cada variável da fórmula.
+    I.num_variaveis = F.num_variaveis; //A quantidade de variáveis que podem receber valores (I.num_variaveis) é a mesma da fórmula (F.num_variaveis). Porque se a fórmula tem, digamos, 3 variáveis (x1, x2, x3), a interpretação também precisa ter espaço pra guardar o valor de cada uma delas (0 ou 1).
+    I.valores = (int*)malloc((F.num_variaveis + 1) * sizeof(int)); //(int*)malloc(...) → aloca esse espaço e transforma o ponteiro retornado em um int*. sizeof(int) → diz quantos bytes precisa reservar pra cada valor (4 bytes normalmente).
+    for (int i = 0; i <= F.num_variaveis; i++) { //Esse loop inicializa todas as variáveis com -1, que significa:“essa variável ainda não recebeu valor”.
+        I.valores[i] = -1;
+    }
     /*Por que +1? Porque as variáveis são numeradas de 1 a N, mas arrays em C começam em 0
 
     Estrutura resultante:
@@ -194,10 +238,6 @@ int main() {
     0 = falso
     1 = verdadeiro*/
 
-    for (int i = 0; i <= F.num_variaveis; i++) {
-        I.valores[i] = -1;
-    }
-    
     if (resolver_sat(&F, &I)) {
         printf("SAT\n");
         for (int i = 1; i <= F.num_variaveis; i++) {
@@ -225,7 +265,7 @@ int main() {
     Finalmente: Liberar o array de valores
     I.valores foi alocado com malloc
 
-    ⚠️ ORDEM IMPORTANTE: Se fizéssemos free(F.clausulas) antes, perderíamos o acesso aos literais individuais e teríamos memory leaks!*/
+    ORDEM IMPORTANTE: Se fizéssemos free(F.clausulas) antes, perderíamos o acesso aos literais individuais e teríamos memory leaks!*/
     
     return 0;
 }
