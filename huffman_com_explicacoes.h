@@ -584,7 +584,6 @@ void decompact(const char* compressed_filename, char final_format[]) {
     /*Quem fornece esses valores?
     Do main.c:
     
-    
     printf("\nInsira o nome do arquivo compactado (.huff):\n");
     scanf("%s", compressed_filename);  // ← usuário digita
     
