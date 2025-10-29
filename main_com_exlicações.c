@@ -93,7 +93,7 @@ int main() {
         char base_name[BUFFER_SIZE];
         strcpy(base_name, filename);  // Copia, por exemplo, "foto.jpg" para base_name
 
-        char* dot = strrchr(base_name, '.');  // Encontra o ÚLTIMO ponto
+        char* dot = strrchr(base_name, '.');  // Encontra o ÚLTIMO ponto '.'
         if (dot != NULL) {
             *dot = '\0'; // Coloca fim de string no lugar do ponto
             /*dot é um ponteiro para a posição do ponto 
@@ -105,9 +105,7 @@ int main() {
 
         // Cria um novo nome com extensão .huff
         char new_file_name[1024];
-        snprintf(new_file_name, sizeof(new_file_name), "%.*s.huff", 
-        (int)(sizeof(new_file_name) - strlen(".huff") - 1), 
-        base_name); 
+        snprintf(new_file_name, sizeof(new_file_name), "%.*s.huff", (int)(sizeof(new_file_name) - strlen(".huff") - 1), base_name); 
         /*%.*s = Imprime uma string com limite de tamanho
 
         O cálculo (int)(sizeof(new_file_name) - strlen(".huff") - 1) tenta evitar overflow*/
@@ -228,7 +226,7 @@ Exemplo:
 
 Por quê? Caracteres mais frequentes têm códigos mais curtos
 
-📝 write_header()
+write_header()
 O que faz: Escreve informações necessárias para descompactar
 
 Contém:
@@ -236,7 +234,7 @@ Lixo: Bits extras no final
 Tamanho da árvore: Quantos nós tem
 Árvore em pré-ordem: Para reconstruir depois
 
-⚡ compactor()
+compactor()
 O que faz: Substitui cada caractere pelo seu código Huffman
 
 Como:
@@ -260,14 +258,14 @@ OPÇÃO 2 - DESCOMPACTAR ARQUIVO
 
 Como Funciona Cada Parte:
 
-📖 read_header()
+read_header()
 O que faz: Lê os primeiros 2 bytes do arquivo
 
 Extrai:
 3 bits: Quantidade de bits "lixo" no final
 13 bits: Tamanho da árvore de Huffman
 
-🌱 read_tree()
+read_tree()
 O que faz: Reconstrói a árvore a partir da representação salva
 
 Como: Lê em pré-ordem:
@@ -275,7 +273,7 @@ Como: Lê em pré-ordem:
 '0' → nó interno (continua lendo filhos)
 '1' → folha (próximo byte é o caractere)
 
-🔍 decompress()
+decompress()
 O que faz: Converte bits de volta em caracteres
 
 Como:
