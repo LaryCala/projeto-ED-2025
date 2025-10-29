@@ -201,24 +201,6 @@ NODE* remove_lower(PRIORITY_QUEUE* pq) {
     return min; //Retorna o elemento
 }
 
-//Função de DEBUG, não aparece quando o código (main.c) é compilado.
-/*void print_priority_queue(PRIORITY_QUEUE* pq) {
-    if (pq == NULL || pq->size == 0) {
-        printf("Fila vazia ou inexistente.\n");
-        return;
-    }
-
-    printf("Conteúdo da fila de prioridade:\n");
-    for (int i = 0; i < pq->size; i++) {
-        NODE* current = pq->data[i];
-        if (current->character >= 32 && current->character <= 126) {
-            printf("'%c' (%d): freq = %d\n", current->character, current->character, current->frequency);
-        } else {
-            printf("'\\x%02x' (%d): freq = %d\n", (unsigned char)current->character, current->character, current->frequency);
-        }
-    }
-}*/
-
 void free_priority_queue(PRIORITY_QUEUE* pq) {
     if (pq == NULL) return;
 
