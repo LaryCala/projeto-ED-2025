@@ -2,9 +2,9 @@
 #include <stdlib.h>
 
 typedef struct {
-    float *dados;     
-    float *segmento; 
-    int n;         
+    float *dados;     //Guarda os valores originais
+    float *segmento; //É um array que representa a árvore
+    int n;          //Número de elementos no array
 } ArvoreSegmentos;
 
 ArvoreSegmentos* inicializar(float *valores, int n) {
